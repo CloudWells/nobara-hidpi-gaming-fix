@@ -1,0 +1,47 @@
+From 0000000000000000000000000000000000000001 Mon Sep 17 00:00:00 2001
+From: CloudWells <151101453+CloudWells@users.noreply.github.com>
+Date: Sun, 24 Aug 2026 01:40:00 +0400
+Subject: [PATCH] xwayland: avoid CARD32 dotClock overflow in generated CVT
+ modes
+
+A full-blanking CVT mode for a large, high-refresh emulated mode
+(e.g. a scaled 4K 240Hz output) needs a pixel clock above the CARD32
+range of RandR's dotClock and wraps around, advertising a garbage
+refresh rate (19.92 Hz) to X11 clients. Retry with reduced blanking,
+then fall back to zero-blanking synthetic timings.
+---
+
+--- a/hw/xwayland/xwayland-cvt.c
++++ b/hw/xwayland/xwayland-cvt.c
+@@ -39,6 +39,31 @@
+     libxcvt_mode_info =
+         libxcvt_gen_mode_info(hdisplay, vdisplay, vrefresh, reduced, interlaced);
+ 
++    /* RandR's dotClock is a CARD32 in Hz, a hard ceiling of ~4.295 GHz.
++     * A full-blanking CVT mode for a large, high-refresh mode (e.g. an
++     * emulated mode for a scaled 4K 240Hz output) can exceed it; the
++     * conversion below would then wrap around and advertise a garbage
++     * refresh rate (e.g. 19.92 Hz instead of 240 Hz) to X11 clients.
++     * Retry with reduced blanking; should even that overflow, fall back
++     * to synthetic zero-blanking timings preserving the refresh rate.
++     */
++    if (!reduced && libxcvt_mode_info->dot_clock > 0xffffffffull / 1000) {
++        free(libxcvt_mode_info);
++        libxcvt_mode_info =
++            libxcvt_gen_mode_info(hdisplay, vdisplay, vrefresh, TRUE, interlaced);
++    }
++
++    if (libxcvt_mode_info->dot_clock > 0xffffffffull / 1000) {
++        libxcvt_mode_info->hsync_start = hdisplay;
++        libxcvt_mode_info->hsync_end   = hdisplay;
++        libxcvt_mode_info->htotal      = hdisplay;
++        libxcvt_mode_info->vsync_start = vdisplay;
++        libxcvt_mode_info->vsync_end   = vdisplay;
++        libxcvt_mode_info->vtotal      = vdisplay;
++        libxcvt_mode_info->dot_clock   =
++            (uint64_t) ((double) hdisplay * vdisplay * vrefresh / 1000.0);
++    }
++
+     modeinfo->width      = libxcvt_mode_info->hdisplay;
+     modeinfo->height     = libxcvt_mode_info->vdisplay;
+     modeinfo->dotClock   = libxcvt_mode_info->dot_clock * 1000.0;

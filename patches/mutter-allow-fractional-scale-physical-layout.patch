@@ -1,0 +1,26 @@
+--- a/src/backends/native/meta-monitor-manager-native.c	2026-08-24 00:29:57.692613695 +0400
++++ b/src/backends/native/meta-monitor-manager-native.c	2026-08-24 00:29:57.736275306 +0400
+@@ -430,7 +430,6 @@
+     case META_LOGICAL_MONITOR_LAYOUT_MODE_LOGICAL:
+       break;
+     case META_LOGICAL_MONITOR_LAYOUT_MODE_PHYSICAL:
+-      constraints |= META_MONITOR_SCALES_CONSTRAINT_NO_FRAC;
+       break;
+     }
+ 
+--- a/src/backends/meta-monitor-config-manager.c
++++ b/src/backends/meta-monitor-config-manager.c
+@@ -1857,13 +1857,6 @@
+       }
+ 
+     case META_LOGICAL_MONITOR_LAYOUT_MODE_PHYSICAL:
+-      if (!G_APPROX_VALUE (scale, roundf (scale), FLT_EPSILON))
+-        {
+-          g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+-                       "A fractional scale with physical layout mode not allowed");
+-          return FALSE;
+-        }
+-
+       expected_mode_width = layout_width;
+       expected_mode_height = layout_height;
+       break;
